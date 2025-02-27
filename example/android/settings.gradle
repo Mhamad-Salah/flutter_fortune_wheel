@@ -1,11 +1,56 @@
-include ':app'
+// This is a new settings.gradle file that's used by the Flutter tool to generate the
+// app_plugin_loader.gradle file when it's running on Flutter versions that support
+// the Android Gradle Plugin (AGP) that requires the new plugin mechanism.
+// You can read more about the requirements in the documentation for the
+// flutter-gradle-plugin at:
+// https://github.com/flutter/packages/blob/main/packages/flutter_tools/gradle/src/main/groovy/flutter.groovy
 
-def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
-def properties = new Properties()
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
 
-assert localPropertiesFile.exists()
-localPropertiesFile.withReader("UTF-8") { reader -> properties.load(reader) }
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
-def flutterSdkPath = properties.getProperty("flutter.sdk")
-assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-apply from: "$flutterSdkPath/packages/flutter_tools/gradle/app_plugin_loader.gradle"
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+// This buildscript block must appear after pluginManagement but before plugins block
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // AGP version is defined by Flutter
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "8.1.0" apply false
+    id "org.jetbrains.kotlin.android" version "1.8.10" apply false
+}
+
+include ":app"
+
+def flutterProjectRoot = rootProject.projectDir.parentFile.toPath()
+def plugins = new Properties()
+def pluginsFile = new File(flutterProjectRoot.toFile(), '.flutter-plugins')
+if (pluginsFile.exists()) {
+    pluginsFile.withReader('UTF-8') { reader -> plugins.load(reader) }
+}
+
+plugins.each { name, path ->
+    def pluginDirectory = flutterProjectRoot.resolve(path).resolve('android').toFile()
+    include ":$name"
+    project(":$name").projectDir = pluginDirectory
+}
